@@ -28,6 +28,7 @@ export class ProductService {
               quantity: qty,
               inStock: qty > 0,
               isActive: typeof p.isActive === 'boolean' ? p.isActive : true,
+              images: Array.isArray(p.images) ? p.images : [],
             };
           });
           this.products.set(migrated);
@@ -50,7 +51,7 @@ export class ProductService {
     }
   }
 
-  addProduct(newProduct: Omit<Product, 'id'>) {
+  addProduct(newProduct: Omit<Product, 'id'>): Product {
     const list = this.products();
     const maxId = list.reduce((max, p) => (p.id > max ? p.id : max), 0);
     const product: Product = {
@@ -58,9 +59,10 @@ export class ProductService {
       ...newProduct,
     };
     this.saveProducts([product, ...list]);
+    return product;
   }
 
-  updateProduct(id: number, updatedData: Omit<Product, 'id'>) {
+  updateProduct(id: number, updatedData: Partial<Omit<Product, 'id'>>) {
     const list = this.products().map((p) => (p.id === id ? { ...p, ...updatedData } : p));
     this.saveProducts(list);
   }

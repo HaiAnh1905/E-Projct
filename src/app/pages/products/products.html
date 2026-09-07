@@ -76,6 +76,7 @@
         <thead>
           <tr>
             <th class="th-stt">STT</th>
+            <th class="th-image">Hình ảnh</th>
             <th class="th-name">Tên sản phẩm</th>
             <th class="th-category">Danh mục</th>
             <th class="th-price">Giá bán</th>
@@ -90,6 +91,19 @@
           @for (product of paginatedProducts(); track product.id; let index = $index) {
             <tr [class.row-disabled]="!product.isActive">
               <td class="td-stt">{{ startIndex() + index }}</td>
+              <td class="td-image">
+                @if (product.images && product.images.length > 0) {
+                  <img [src]="product.images[0]" [alt]="product.name" class="table-img-thumb" />
+                } @else {
+                  <div class="no-img-thumb">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                      <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                  </div>
+                }
+              </td>
               <td class="td-name" [title]="product.name">
                 <span class="product-name-text">{{ product.name }}</span>
               </td>
@@ -155,7 +169,7 @@
             </tr>
           } @empty {
             <tr>
-              <td colspan="9" class="no-data">
+              <td colspan="10" class="no-data">
                 <div class="empty-state">
                   <span class="empty-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -257,7 +271,7 @@
             <h3>Thêm sản phẩm mới</h3>
           }
         </div>
-        <button class="btn-close" (click)="closeFormModal()">✕</button>
+        <button class="btn-close" (click)="closeFormModal()" [disabled]="isUploadingImages()">✕</button>
       </div>
 
       <form [formGroup]="productForm" (ngSubmit)="onSaveProduct()" novalidate class="modal-body">
@@ -334,6 +348,94 @@
           </div>
         </div>
 
+        <!-- Product Images Upload & Management -->
+        <div class="form-field">
+          <label>Hình ảnh sản phẩm (Dán link URL trực tiếp hoặc Tải tệp từ máy tính)</label>
+          <div class="image-upload-wrapper">
+            <!-- Option 1: Direct URL Input -->
+            <div class="url-input-row">
+              <input 
+                type="text" 
+                [ngModel]="imageUrlInput()" 
+                (ngModelChange)="imageUrlInput.set($event)" 
+                [ngModelOptions]="{standalone: true}"
+                placeholder="Dán link ảnh từ Internet (vd: https://domain.com/image.jpg)..." 
+                class="url-input"
+                (keydown.enter)="$event.preventDefault(); addImageUrl()"
+              />
+              <button 
+                type="button" 
+                class="btn-add-url" 
+                (click)="addImageUrl()"
+                [disabled]="!imageUrlInput().trim()"
+              >
+                + Thêm URL
+              </button>
+            </div>
+
+            <div class="upload-divider"><span>Hoặc chọn tệp từ thiết bị</span></div>
+
+            <!-- Option 2: File Picker from Device -->
+            <input 
+              #fileInput 
+              type="file" 
+              multiple 
+              accept="image/*" 
+              (change)="onFilesSelected($event)" 
+              style="display: none;" 
+            />
+            <button 
+              type="button" 
+              class="btn-upload-trigger" 
+              (click)="fileInput.click()"
+              [disabled]="isUploadingImages()"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+                <line x1="12" y1="9" x2="12" y2="15"></line>
+                <line x1="9" y1="12" x2="15" y2="12"></line>
+              </svg>
+              <span>+ Chọn hình ảnh từ máy tính</span>
+            </button>
+
+            @if (existingImages().length > 0 || pendingImageFiles().length > 0) {
+              <div class="image-preview-grid">
+                <!-- Existing Saved Images -->
+                @for (imgUrl of existingImages(); track $index) {
+                  <div class="preview-item">
+                    <img [src]="imgUrl" alt="Ảnh sản phẩm" class="preview-thumb" />
+                    <button 
+                      type="button" 
+                      class="btn-remove-img" 
+                      (click)="removeExistingImage($index)" 
+                      title="Xóa ảnh cũ này"
+                      [disabled]="isUploadingImages()"
+                    >✕</button>
+                    <span class="img-badge badge-old">Đã lưu</span>
+                  </div>
+                }
+
+                <!-- Newly Selected Pending Files -->
+                @for (item of pendingImageFiles(); track $index) {
+                  <div class="preview-item">
+                    <img [src]="item.previewUrl" alt="Ảnh mới" class="preview-thumb" />
+                    <button 
+                      type="button" 
+                      class="btn-remove-img" 
+                      (click)="removePendingFile($index)" 
+                      title="Hủy chọn ảnh này"
+                      [disabled]="isUploadingImages()"
+                    >✕</button>
+                    <span class="img-badge badge-new">Mới</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
         <!-- Description -->
         <div class="form-field">
           <label for="prod-desc">Mô tả sản phẩm</label>
@@ -346,9 +448,14 @@
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-secondary" (click)="closeFormModal()">Hủy</button>
-          <button type="submit" class="btn-primary">
-            <span>{{ editingProduct() ? 'Cập nhật sản phẩm' : 'Lưu sản phẩm' }}</span>
+          <button type="button" class="btn-secondary" (click)="closeFormModal()" [disabled]="isUploadingImages()">Hủy</button>
+          <button type="submit" class="btn-primary" [disabled]="isUploadingImages()">
+            @if (isUploadingImages()) {
+              <span class="spinner"></span>
+              <span>Đang lưu & tải ảnh lên Cloudinary...</span>
+            } @else {
+              <span>{{ editingProduct() ? 'Cập nhật sản phẩm' : 'Lưu sản phẩm' }}</span>
+            }
           </button>
         </div>
       </form>

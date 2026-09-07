@@ -4,6 +4,7 @@ import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModu
 import { Subject, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { ProductService } from '../../services/product.service';
+import { CloudinaryService } from '../../services/cloudinary.service';
 import { Product } from '../../models/product.model';
 
 @Component({
@@ -15,6 +16,7 @@ import { Product } from '../../models/product.model';
 })
 export class ProductsPage implements OnInit, OnDestroy {
   private productService = inject(ProductService);
+  private cloudinaryService = inject(CloudinaryService);
   private fb = inject(FormBuilder);
 
   // RxJS Subjects for real-time debounced search & debounced filter selection
@@ -48,6 +50,19 @@ export class ProductsPage implements OnInit, OnDestroy {
 
   editingProduct = signal<Product | null>(null);
   deletingProduct = signal<Product | null>(null);
+
+  // Image Management State
+  existingImages = signal<string[]>([]);
+  pendingImageFiles = signal<{ file: File; previewUrl: string }[]>([]);
+  isUploadingImages = signal<boolean>(false);
+  imageUrlInput = signal<string>('');
+
+  addImageUrl() {
+    const url = this.imageUrlInput().trim();
+    if (!url) return;
+    this.existingImages.set([...this.existingImages(), url]);
+    this.imageUrlInput.set('');
+  }
 
   // Custom Validator to check duplicate product name
   private uniqueProductNameValidator(): ValidatorFn {
@@ -219,11 +234,50 @@ export class ProductsPage implements OnInit, OnDestroy {
     this.currentPage.set(1);
   }
 
+  // --- Image Handling ---
+
+  onFilesSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const filesArray = Array.from(input.files);
+    const newItems: { file: File; previewUrl: string }[] = [];
+
+    let loadedCount = 0;
+    filesArray.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const previewUrl = (e.target?.result as string) || '';
+        newItems.push({ file, previewUrl });
+        loadedCount++;
+        if (loadedCount === filesArray.length) {
+          this.pendingImageFiles.set([...this.pendingImageFiles(), ...newItems]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    input.value = '';
+  }
+
+  removeExistingImage(index: number) {
+    this.existingImages.set(this.existingImages().filter((_, i) => i !== index));
+  }
+
+  removePendingFile(index: number) {
+    this.pendingImageFiles.set(this.pendingImageFiles().filter((_, i) => i !== index));
+  }
+
   // --- CRUD Modal Actions ---
 
   openAddModal() {
     this.editingProduct.set(null);
     this.isFormSubmitted.set(false);
+    this.existingImages.set([]);
+    this.pendingImageFiles.set([]);
+    this.isUploadingImages.set(false);
+    this.imageUrlInput.set('');
+
     this.productForm.reset({
       name: '',
       price: null,
@@ -238,6 +292,11 @@ export class ProductsPage implements OnInit, OnDestroy {
   openEditModal(product: Product) {
     this.editingProduct.set(product);
     this.isFormSubmitted.set(false);
+    this.existingImages.set([...(product.images || [])]);
+    this.pendingImageFiles.set([]);
+    this.isUploadingImages.set(false);
+    this.imageUrlInput.set('');
+
     this.productForm.patchValue({
       name: product.name,
       price: product.price,
@@ -250,16 +309,19 @@ export class ProductsPage implements OnInit, OnDestroy {
   }
 
   closeFormModal() {
+    if (this.isUploadingImages()) return;
     this.isFormModalOpen.set(false);
     this.isFormSubmitted.set(false);
   }
 
-  onSaveProduct() {
+  async onSaveProduct() {
     this.isFormSubmitted.set(true);
     if (this.productForm.invalid) {
       this.productForm.markAllAsTouched();
       return;
     }
+
+    this.isUploadingImages.set(true);
 
     const formValues = this.productForm.value;
     const qty = Math.max(0, Number(formValues.quantity));
@@ -273,14 +335,36 @@ export class ProductsPage implements OnInit, OnDestroy {
       inStock: qty > 0,
       isActive: currentEdit ? currentEdit.isActive : true,
       description: (formValues.description || '').trim(),
+      images: this.existingImages(),
     };
 
+    let productId: number;
+
+    // STEP 1: Save product metadata to local storage first (as required by prompt)
     if (currentEdit) {
-      this.productService.updateProduct(currentEdit.id, productData);
+      productId = currentEdit.id;
+      this.productService.updateProduct(productId, productData);
     } else {
-      this.productService.addProduct(productData);
+      const created = this.productService.addProduct(productData);
+      productId = created.id;
     }
 
+    // STEP 2: Upload new image files to Cloudinary, retrieve returned URLs, and update product data
+    const pending = this.pendingImageFiles();
+    if (pending.length > 0) {
+      try {
+        const uploadPromises = pending.map((item) => this.cloudinaryService.uploadImage(item.file));
+        const uploadedUrls = await Promise.all(uploadPromises);
+        const finalImages = [...this.existingImages(), ...uploadedUrls.filter((url) => !!url)];
+
+        // Update product with uploaded Cloudinary URLs
+        this.productService.updateProduct(productId, { images: finalImages });
+      } catch (err) {
+        console.error('Error uploading images to Cloudinary:', err);
+      }
+    }
+
+    this.isUploadingImages.set(false);
     this.closeFormModal();
   }
 
