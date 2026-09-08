@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, PLATFORM_ID, signal, OnInit
 import { isPlatformBrowser } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
+import { ToastService } from '../services/toast.service';
+
 @Component({
   selector: 'app-layout',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
@@ -12,6 +14,7 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 export class Layout implements OnInit {
   private router = inject(Router);
   private platformId = inject(PLATFORM_ID);
+  public toastService = inject(ToastService);
 
   adminEmail = signal<string>('admin@gmail.com');
   isSidebarOpen = signal<boolean>(true);

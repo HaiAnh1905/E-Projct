@@ -44,22 +44,34 @@ export class Login {
 
     if (this.loginForm.valid) {
       const { email, password } = this.loginForm.value;
-      if (email !== 'admin@gmail.com' || password !== '12345679') {
-        this.loginError.set('Sai tài khoản hoặc mật khẩu');
+      const cleanEmail = String(email).trim().toLowerCase();
+
+      let role = 'user';
+      if (cleanEmail === 'admin@gmail.com' && password === '12345679') {
+        role = 'admin';
+      } else if (password && password.length >= 8) {
+        role = 'user';
+      } else {
+        this.loginError.set('Mật khẩu phải từ 8 ký tự trở lên');
         return;
       }
 
-      // Lưu mock token & email vào localStorage khi ở trên Browser
+      // Lưu mock token, email & role vào localStorage khi ở trên Browser
       if (isPlatformBrowser(this.platformId)) {
         localStorage.setItem('auth_token', 'mock_jwt_token_' + Date.now());
-        localStorage.setItem('user_email', email);
+        localStorage.setItem('user_email', cleanEmail);
+        localStorage.setItem('user_role', role);
       }
 
       this.loginSuccess.set(true);
 
-      // Chuyển hướng sang trang Dashboard sau khi đăng nhập thành công
+      // Chuyển hướng sang trang Dashboard (Admin) hoặc Home (User)
       setTimeout(() => {
-        this.router.navigate(['/dashboard']);
+        if (role === 'admin') {
+          this.router.navigate(['/dashboard']);
+        } else {
+          this.router.navigate(['/home']);
+        }
       }, 600);
     } else {
       this.loginForm.markAllAsTouched();

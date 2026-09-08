@@ -1,0 +1,78 @@
+<div class="home-page">
+  <!-- Top Navigation Header -->
+  <header class="home-header">
+    <div class="header-container">
+      <div class="logo-group">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">
+          <h1>E-Project Store</h1>
+          <span>Trang mua sắm sản phẩm công nghệ</span>
+        </div>
+      </div>
+
+      <div class="user-menu">
+        <div class="user-info">
+          <span class="user-badge" [class.badge-admin]="userRole() === 'admin'">
+            {{ userRole() === 'admin' ? 'Quyền: QTV / Admin' : 'Khách hàng' }}
+          </span>
+          <span class="user-email">{{ userEmail() }}</span>
+        </div>
+        @if (userRole() === 'admin') {
+          <a routerLink="/dashboard" class="btn-admin-panel">Trang Quản Trị Admin ➔</a>
+        }
+        <button class="btn-logout" (click)="onLogout()">Đăng xuất</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-banner">
+    <div class="hero-content">
+      <h2>Chào mừng bạn đến với E-Project Store</h2>
+      <p>Trải nghiệm các sản phẩm công nghệ mới nhất với giá cực kỳ ưu đãi và bảo hành chính hãng.</p>
+      <div class="hero-tags">
+        <span>📱 Điện thoại</span>
+        <span>💻 Laptop</span>
+        <span>🎧 Phụ kiện</span>
+        <span>⌚ Đồng hồ</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Featured Products Section -->
+  <main class="products-section">
+    <div class="section-header">
+      <h3>Danh sách sản phẩm nổi bật</h3>
+      <span class="product-count">Hiển thị {{ products().length }} sản phẩm khả dụng</span>
+    </div>
+
+    <div class="products-grid">
+      @for (prod of products(); track prod.id) {
+        <div class="product-card">
+          <div class="card-image">
+            @if (prod.images && prod.images.length > 0) {
+              <img [src]="prod.images[0]" [alt]="prod.name" />
+            } @else {
+              <div class="no-img">📦</div>
+            }
+            <span class="category-tag">{{ prod.category }}</span>
+          </div>
+          <div class="card-body">
+            <h4 class="prod-name" [title]="prod.name">{{ prod.name }}</h4>
+            <p class="prod-desc">{{ prod.description || 'Chưa có mô tả chi tiết' }}</p>
+            <div class="card-footer">
+              <span class="prod-price">{{ formatCurrency(prod.price) }}</span>
+              <span class="stock-status" [class.in-stock]="prod.inStock">
+                {{ prod.inStock ? 'Còn hàng (' + prod.quantity + ')' : 'Hết hàng' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <p>Hiện chưa có sản phẩm nào khả dụng trong cửa hàng.</p>
+        </div>
+      }
+    </div>
+  </main>
+</div>

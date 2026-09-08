@@ -7,6 +7,10 @@ export const routes: Routes = [
     loadComponent: () => import('./Login/Login').then((m) => m.Login),
   },
   {
+    path: 'home',
+    loadComponent: () => import('./pages/home/home').then((m) => m.HomePage),
+  },
+  {
     path: '',
     loadComponent: () => import('./layout/layout').then((m) => m.Layout),
     canActivate: [authGuard],
