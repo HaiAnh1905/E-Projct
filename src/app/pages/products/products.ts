@@ -82,6 +82,10 @@ export class ProductsPage implements OnInit, OnDestroy {
   isUploadingImages = signal<boolean>(false);
   imageUrlInput = signal<string>('');
 
+  // Signal for real-time form value tracking with reactive signals
+  formValuesSignal = signal<any>({});
+  private formValueSub?: Subscription;
+
   initialProductModalState = signal<{
     isEdit: boolean;
     name: string;
@@ -109,19 +113,26 @@ export class ProductsPage implements OnInit, OnDestroy {
     const initial = this.initialProductModalState();
     const isEdit = initial.isEdit;
 
+    // Trigger signal re-evaluation whenever any form field changes via formValuesSignal
+    const formVals = this.formValuesSignal();
+
     // For new product creation, allow submit if form is valid and user typed required values
     if (!isEdit) {
       return this.productForm.valid;
     }
 
     // For editing an existing product, check if any field or image set differs from initial state
-    const formVals = this.productForm.value;
+    const currentName = (formVals?.name ?? this.productForm.get('name')?.value ?? '').trim();
+    const currentPrice = Number(formVals?.price ?? this.productForm.get('price')?.value);
+    const currentCat = formVals?.category ?? this.productForm.get('category')?.value;
+    const currentQty = Number(formVals?.quantity ?? this.productForm.get('quantity')?.value);
+    const currentDesc = (formVals?.description ?? this.productForm.get('description')?.value ?? '').trim();
 
-    const nameChanged = (formVals.name || '').trim() !== (initial.name || '').trim();
-    const priceChanged = Number(formVals.price) !== Number(initial.price);
-    const categoryChanged = formVals.category !== initial.category;
-    const quantityChanged = Number(formVals.quantity) !== Number(initial.quantity);
-    const descChanged = (formVals.description || '').trim() !== (initial.description || '').trim();
+    const nameChanged = currentName !== (initial.name || '').trim();
+    const priceChanged = currentPrice !== Number(initial.price);
+    const categoryChanged = currentCat !== initial.category;
+    const quantityChanged = currentQty !== Number(initial.quantity);
+    const descChanged = currentDesc !== (initial.description || '').trim();
 
     const currentExisting = this.existingImages();
     const existingImagesChanged =
@@ -283,12 +294,17 @@ export class ProductsPage implements OnInit, OnDestroy {
       this.appliedSort.set(this.selectedSort());
       this.currentPage.set(1);
     });
+
+    this.formValueSub = this.productForm.valueChanges.subscribe((val) => {
+      this.formValuesSignal.set(val);
+    });
   }
 
   ngOnDestroy() {
     this.querySub?.unsubscribe();
     this.searchSub?.unsubscribe();
     this.filterSub?.unsubscribe();
+    this.formValueSub?.unsubscribe();
   }
 
   onSearchInput(event: Event) {
@@ -412,6 +428,7 @@ export class ProductsPage implements OnInit, OnDestroy {
       pendingFilesCount: 0,
     });
 
+    this.formValuesSignal.set(this.productForm.value);
     this.isFormModalOpen.set(true);
   }
 
@@ -447,6 +464,7 @@ export class ProductsPage implements OnInit, OnDestroy {
       pendingFilesCount: 0,
     });
 
+    this.formValuesSignal.set(this.productForm.value);
     this.isFormModalOpen.set(true);
   }
 
@@ -554,7 +572,7 @@ export class ProductsPage implements OnInit, OnDestroy {
       case 'shipped':
         return 'Đang giao hàng';
       case 'delivered':
-        return 'Đã giao hàng';
+        return 'Giao hàng thành công';
       case 'cancelled':
         return 'Đã hủy';
       default:

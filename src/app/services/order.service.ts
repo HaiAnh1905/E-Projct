@@ -7,13 +7,20 @@ import { INITIAL_ORDERS, Order, OrderStatus } from '../models/order.model';
 })
 export class OrderService {
   private platformId = inject(PLATFORM_ID);
-  private storageKey = 'admin_orders_data';
+  private storageKey = 'admin_orders_data_v2';
 
   rawOrders = signal<Order[]>([]);
   orders: Signal<Order[]> = computed(() => this.rawOrders().filter((ord) => !ord.isDeleted));
 
   constructor() {
     this.loadOrders();
+    if (isPlatformBrowser(this.platformId)) {
+      window.addEventListener('storage', (event) => {
+        if (event.key === this.storageKey) {
+          this.loadOrders();
+        }
+      });
+    }
   }
 
   private parseDateTimestamp(dateStr: string | null | undefined): number {
@@ -46,32 +53,64 @@ export class OrderService {
       let newOrderDate = ord.orderDate;
       let newDeliveryDate = ord.deliveryDate;
 
-      // If orderDate is in the future (> Date.now()), remap/clamp to valid past date
+      // If orderDate is in the future (> Date.now()), clamp to current time
       if (orderTime > nowTime) {
-        const dObj = new Date(orderTime);
-        if (dObj.getFullYear() >= 2026 && dObj.getMonth() >= 9) {
-          dObj.setMonth(6); // Remap Oct or later to July
-        } else if (dObj.getFullYear() >= 2026 && dObj.getMonth() === 8 && dObj.getDate() > 8) {
-          dObj.setDate((dObj.getDate() % 8) + 1); // Remap Sept 9-30 to Sept 1-8
-        } else {
-          dObj.setMonth(7); // Aug
-        }
-
+        const dObj = new Date(nowTime);
         const pad = (n: number) => n.toString().padStart(2, '0');
         newOrderDate = `${dObj.getFullYear()}-${pad(dObj.getMonth() + 1)}-${pad(dObj.getDate())} ${pad(dObj.getHours())}:${pad(dObj.getMinutes())}`;
-        orderTime = new Date(dObj).getTime();
+        orderTime = dObj.getTime();
       }
 
-      // If status is NOT delivered, deliveryDate MUST be null
-      if (ord.status !== 'delivered') {
+      const initialMatch = INITIAL_ORDERS.find((i) => i.id === ord.id);
+
+      // deliveryDate is kept for both 'delivered' and 'returned' orders
+      if (ord.status !== 'delivered' && ord.status !== 'returned') {
         newDeliveryDate = null;
       } else if (deliveryTime > nowTime) {
-        // If delivered but deliveryDate is in the future, clamp to min(nowTime, orderTime + 2h)
-        const delTimeTarget = Math.min(nowTime, orderTime > 0 ? orderTime + 2 * 3600 * 1000 : nowTime);
+        const delTimeTarget = Math.min(
+          nowTime,
+          orderTime > 0 ? orderTime + 2 * 3600 * 1000 : nowTime,
+        );
         const delObj = new Date(delTimeTarget);
         const pad = (n: number) => n.toString().padStart(2, '0');
         newDeliveryDate = `${delObj.getFullYear()}-${pad(delObj.getMonth() + 1)}-${pad(delObj.getDate())} ${pad(delObj.getHours())}:${pad(delObj.getMinutes())}`;
         deliveryTime = delTimeTarget;
+      } else if (ord.status === 'returned') {
+        let returnTime = ord.returnDate ? this.parseDateTimestamp(ord.returnDate) : nowTime;
+        if (!newDeliveryDate || (deliveryTime > 0 && deliveryTime >= returnTime)) {
+          if (
+            initialMatch &&
+            initialMatch.deliveryDate &&
+            this.parseDateTimestamp(initialMatch.deliveryDate) < returnTime
+          ) {
+            newDeliveryDate = initialMatch.deliveryDate;
+            deliveryTime = this.parseDateTimestamp(newDeliveryDate);
+          } else {
+            const baseTime = orderTime > 0 ? orderTime : Math.max(0, returnTime - 48 * 3600 * 1000);
+            const delTimeTarget = Math.min(
+              nowTime,
+              Math.max(baseTime, returnTime - 24 * 3600 * 1000),
+            );
+            const delObj = new Date(delTimeTarget);
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            newDeliveryDate = `${delObj.getFullYear()}-${pad(delObj.getMonth() + 1)}-${pad(delObj.getDate())} ${pad(delObj.getHours())}:${pad(delObj.getMinutes())}`;
+            deliveryTime = delTimeTarget;
+          }
+        }
+      } else if (!newDeliveryDate && ord.status === 'delivered') {
+        if (initialMatch && initialMatch.deliveryDate) {
+          newDeliveryDate = initialMatch.deliveryDate;
+          deliveryTime = this.parseDateTimestamp(newDeliveryDate);
+        } else {
+          const delTimeTarget = Math.min(
+            nowTime,
+            orderTime > 0 ? orderTime + 2 * 3600 * 1000 : nowTime,
+          );
+          const delObj = new Date(delTimeTarget);
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          newDeliveryDate = `${delObj.getFullYear()}-${pad(delObj.getMonth() + 1)}-${pad(delObj.getDate())} ${pad(delObj.getHours())}:${pad(delObj.getMinutes())}`;
+          deliveryTime = delTimeTarget;
+        }
       }
 
       let newReturnDate = ord.returnDate;
@@ -82,7 +121,10 @@ export class OrderService {
         const minTime = deliveryTime > 0 ? deliveryTime : orderTime;
 
         if (returnTime < minTime || returnTime > nowTime) {
-          const retTimeTarget = Math.min(nowTime, minTime > 0 ? minTime + 2 * 3600 * 1000 : nowTime);
+          const retTimeTarget = Math.min(
+            nowTime,
+            minTime > 0 ? minTime + 2 * 3600 * 1000 : nowTime,
+          );
           const retObj = new Date(retTimeTarget);
           const pad = (n: number) => n.toString().padStart(2, '0');
           newReturnDate = `${retObj.getFullYear()}-${pad(retObj.getMonth() + 1)}-${pad(retObj.getDate())} ${pad(retObj.getHours())}:${pad(retObj.getMinutes())}`;
@@ -100,7 +142,7 @@ export class OrderService {
     });
   }
 
-  private loadOrders() {
+  loadOrders() {
     if (isPlatformBrowser(this.platformId)) {
       const data = localStorage.getItem(this.storageKey);
       if (data) {
@@ -144,7 +186,7 @@ export class OrderService {
         let updatedReturnDate: string | null = null;
         const nowTime = Date.now();
 
-        if (newStatus === 'delivered') {
+        if (newStatus === 'delivered' || newStatus === 'returned') {
           if (deliveryDate && deliveryDate.trim()) {
             const inputTime = this.parseDateTimestamp(deliveryDate);
             if (inputTime > nowTime) {
@@ -244,6 +286,7 @@ export class OrderService {
   }
 
   addOrder(newOrder: Omit<Order, 'id'>): Order {
+    this.loadOrders();
     const list = this.rawOrders();
     const count = list.length + 1;
     const padCount = count.toString().padStart(3, '0');
@@ -255,5 +298,10 @@ export class OrderService {
     };
     this.saveOrders([created, ...list]);
     return created;
+  }
+
+  resetOrdersData() {
+    const sanitizedInitial = this.sanitizeOrderList(INITIAL_ORDERS);
+    this.saveOrders(sanitizedInitial);
   }
 }

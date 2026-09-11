@@ -171,6 +171,18 @@ export class OrdersPage implements OnInit, OnDestroy {
     return { isBlocked: false, message: '' };
   });
 
+  // Check if an order has exceeded the 7-day return window from purchase date (orderDate)
+  isReturnExpired(order: Order | null): boolean {
+    if (!order || !order.orderDate) return false;
+    const orderTime = this.parseOrderDate(order.orderDate);
+    if (orderTime <= 0) return false;
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const checkTime = this.returnDateInput().trim()
+      ? this.parseOrderDate(this.returnDateInput())
+      : Date.now();
+    return checkTime - orderTime > SEVEN_DAYS_MS;
+  }
+
   // Helper method to check if selecting a targetStatus is disabled for current order status
   isStatusOptionDisabled(targetStatus: OrderStatus): boolean {
     const order = this.selectedOrderForStatus();
@@ -184,9 +196,11 @@ export class OrdersPage implements OnInit, OnDestroy {
     // Terminal statuses (cancelled or returned) cannot be changed to any other status
     if (current === 'cancelled' || current === 'returned') return true;
 
-    // 'returned' can ONLY be selected if current status is 'delivered'
+    // 'returned' can ONLY be selected if current status is 'delivered' AND within 7 days of purchase date
     if (targetStatus === 'returned') {
-      return current !== 'delivered';
+      if (current !== 'delivered') return true;
+      if (this.isReturnExpired(order)) return true;
+      return false;
     }
 
     // 'cancelled' can ONLY be selected BEFORE 'delivered' (i.e., not allowed if current is 'delivered')
@@ -229,22 +243,30 @@ export class OrdersPage implements OnInit, OnDestroy {
       }
 
       if (targetStatus === 'returned') {
-        return {
-          isBlocked: true,
-          message: 'Chỉ có thể chọn Trả hàng khi đơn hàng đang ở trạng thái "Đã giao hàng".',
-        };
+        if (order.status !== 'delivered') {
+          return {
+            isBlocked: true,
+            message: 'Chỉ có thể chọn Trả hàng khi đơn hàng đang ở trạng thái "Giao hàng thành công".',
+          };
+        }
+        if (this.isReturnExpired(order)) {
+          return {
+            isBlocked: true,
+            message: `Đơn hàng được đặt vào ngày ${order.orderDate}. Đã quá thời hạn 7 ngày cho phép Trả hàng kể từ thời điểm mua hàng.`,
+          };
+        }
       }
 
       if (targetStatus === 'cancelled') {
         return {
           isBlocked: true,
-          message: 'Không thể Hủy đơn sau khi đơn hàng đã ở trạng thái "Đã giao hàng".',
+          message: 'Không thể Hủy đơn sau khi đơn hàng đã ở trạng thái "Giao hàng thành công".',
         };
       }
 
       return {
         isBlocked: true,
-        message: `Không thể chuyển lùi từ trạng thái "${currentLabel}" về "${targetLabel}". Quy trình phải đi tiến: Chờ xử lý ➔ Đang xử lý ➔ Đang giao hàng ➔ Đã giao hàng.`,
+        message: `Không thể chuyển lùi từ trạng thái "${currentLabel}" về "${targetLabel}". Quy trình phải đi tiến: Chờ xử lý ➔ Đang xử lý ➔ Đang giao hàng ➔ Giao hàng thành công.`,
       };
     }
 
@@ -262,7 +284,7 @@ export class OrdersPage implements OnInit, OnDestroy {
     return { isBlocked: false, message: '' };
   });
 
-  // Validation against return dates before order date or delivery date, or in the future
+  // Validation against return dates before order date or delivery date, or past 7-day limit, or in the future
   returnDateValidation = computed(() => {
     if (this.newStatus() === 'returned') {
       const order = this.selectedOrderForStatus();
@@ -271,6 +293,7 @@ export class OrdersPage implements OnInit, OnDestroy {
 
       const minDateStr = order.deliveryDate || order.orderDate;
       const minTime = this.parseOrderDate(minDateStr);
+      const orderTime = this.parseOrderDate(order.orderDate);
       const now = Date.now();
 
       const returnTime = returnInput ? this.parseOrderDate(returnInput) : now;
@@ -288,6 +311,16 @@ export class OrdersPage implements OnInit, OnDestroy {
           isBlocked: true,
           message: `Ngày trả hàng (${returnInput || 'Thời gian hiện tại'}) không được trước ${dateTypeLabel} (${minDateStr}).`,
         };
+      }
+
+      if (orderTime > 0) {
+        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+        if (returnTime - orderTime > SEVEN_DAYS_MS) {
+          return {
+            isBlocked: true,
+            message: `Thời gian trả hàng (${returnInput || 'Hiện tại'}) đã vượt quá thời hạn 7 ngày cho phép kể từ thời điểm mua hàng (${order.orderDate}).`,
+          };
+        }
       }
     }
     return { isBlocked: false, message: '' };
@@ -502,7 +535,7 @@ export class OrdersPage implements OnInit, OnDestroy {
       order.returnReason || (order.status === 'returned' ? 'Khách hàng trả lại sản phẩm' : '');
     const initReturnDate =
       order.returnDate ||
-      (order.status === 'returned' ? (order.deliveryDate || order.orderDate) : '');
+      (order.status === 'returned' ? order.deliveryDate || order.orderDate : '');
 
     this.newStatus.set(initStatus);
     this.newDeliveryDate.set(initDeliveryDate);
@@ -529,9 +562,7 @@ export class OrdersPage implements OnInit, OnDestroy {
         this.returnReasonInput.set(order.returnReason || 'Khách hàng trả lại sản phẩm');
       }
       if (!this.returnDateInput().trim()) {
-        this.returnDateInput.set(
-          order.returnDate || order.deliveryDate || order.orderDate || '',
-        );
+        this.returnDateInput.set(order.returnDate || order.deliveryDate || order.orderDate || '');
       }
     } else if (status === 'cancelled') {
       if (!this.cancelReasonInput().trim()) {
@@ -563,7 +594,8 @@ export class OrdersPage implements OnInit, OnDestroy {
       this.statusTransitionValidation().isBlocked
     ) {
       let msg = 'Không thể cập nhật trạng thái do vi phạm điều kiện chuyển trạng thái đơn hàng.';
-      if (this.statusTransitionValidation().isBlocked) msg = this.statusTransitionValidation().message;
+      if (this.statusTransitionValidation().isBlocked)
+        msg = this.statusTransitionValidation().message;
       if (this.cancelReasonValidation().isBlocked) msg = this.cancelReasonValidation().message;
       if (this.returnReasonValidation().isBlocked) msg = this.returnReasonValidation().message;
       if (this.returnDateValidation().isBlocked) msg = this.returnDateValidation().message;
@@ -632,7 +664,15 @@ export class OrdersPage implements OnInit, OnDestroy {
         }
       }
 
-      this.orderService.updateOrderStatus(target.id, 'returned', null, null, returnDate, reason);
+      const existingDelivery = target.deliveryDate || this.newDeliveryDate().trim() || null;
+      this.orderService.updateOrderStatus(
+        target.id,
+        'returned',
+        existingDelivery,
+        null,
+        returnDate,
+        reason,
+      );
 
       this.toastService.warning(
         `Đã chuyển đơn hàng #${target.orderCode} sang Trả hàng (Lý do: ${reason}) và tự động cộng lại số lượng sản phẩm vào kho!`,
@@ -688,7 +728,7 @@ export class OrdersPage implements OnInit, OnDestroy {
       return {
         allowed: false,
         message:
-          'Đơn hàng đã phát sinh giao dịch (Đã giao hàng thành công) KHÔNG được phép xóa để đảm bảo toàn vẹn dữ liệu giao dịch & báo cáo doanh thu.',
+          'Đơn hàng đã phát sinh giao dịch (Giao hàng thành công) KHÔNG được phép xóa để đảm bảo toàn vẹn dữ liệu giao dịch & báo cáo doanh thu.',
       };
     }
 
@@ -734,6 +774,20 @@ export class OrdersPage implements OnInit, OnDestroy {
     const pad = (n: number) => n.toString().padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
+
+  maxAllowedReturnDatetime = computed(() => {
+    const order = this.selectedOrderForStatus();
+    if (!order) return this.maxAllowedDatetime;
+
+    const orderTime = this.parseOrderDate(order.orderDate);
+    if (orderTime <= 0) return this.maxAllowedDatetime;
+
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const maxReturnTime = Math.min(Date.now(), orderTime + SEVEN_DAYS_MS);
+    const d = new Date(maxReturnTime);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
 
   minAllowedReturnDatetime = computed(() => {
     const order = this.selectedOrderForStatus();
@@ -792,7 +846,7 @@ export class OrdersPage implements OnInit, OnDestroy {
       case 'shipped':
         return 'Đang giao hàng';
       case 'delivered':
-        return 'Đã giao hàng';
+        return 'Giao hàng thành công';
       case 'cancelled':
         return 'Đã hủy';
       case 'returned':

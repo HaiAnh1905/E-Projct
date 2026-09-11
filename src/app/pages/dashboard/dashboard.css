@@ -812,3 +812,497 @@
   cursor: not-allowed;
   background: #f1f5f9;
 }
+
+/* ==========================================
+   NEW CHARTS SECTION STYLES
+   ========================================== */
+
+.bg-purple-light { background: #f3e8ff !important; border-color: #d8b4fe !important; }
+.bg-emerald-light { background: #ecfdf5 !important; border-color: #a7f3d0 !important; }
+.bg-amber-light { background: #fffbeb !important; border-color: #fde68a !important; }
+
+/* 1. Two-Column Chart Layout Grid */
+.charts-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .charts-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-card-col {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.875rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* Weekly Vertical Bar Chart (7 Days: T2 - CN) - Reference Classic Chart Layout */
+.bar-chart-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 230px;
+  padding-top: 0.5rem;
+}
+
+.weekly-chart-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 0.625rem;
+  width: 100%;
+  height: 210px;
+}
+
+/* Left Y-Axis Labels Column */
+.weekly-y-axis-col {
+  display: flex;
+  flex-direction: column;
+  width: 26px;
+  flex-shrink: 0;
+}
+
+.weekly-y-axis-ticks {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-right: 8px;
+  padding-top: 14px;
+  user-select: none;
+}
+
+.y-tick-label {
+  font-size: 0.78125rem;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.weekly-y-axis-spacer {
+  height: 38px;
+  flex-shrink: 0;
+}
+
+/* Main Chart Area (Solid Y-Axis + Solid Horizontal Gridlines + Baseline) */
+.weekly-chart-area {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-left: 2px solid #cbd5e1; /* Vertical Y-Axis Line */
+}
+
+/* Background Horizontal Gridlines */
+.weekly-grid-lines {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  bottom: 38px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.grid-line-item {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-bottom: 1px solid #e2e8f0; /* Solid horizontal grid lines */
+  width: 100%;
+}
+
+.grid-line-item:last-child {
+  border-bottom: 2px solid #cbd5e1; /* Baseline (0 level) X-Axis Line */
+}
+
+/* 7-Day Bars Container */
+.weekly-bars-wrapper {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 0.5rem;
+  width: 100%;
+  padding-top: 14px;
+}
+
+.weekly-bar-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  max-width: 48px;
+}
+
+.weekly-bar-track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+  padding: 0;
+  border: none;
+}
+
+.weekly-bar-fill {
+  width: 65%;
+  background: linear-gradient(180deg, #a855f7 0%, #7e22ce 100%);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease;
+  position: relative;
+  min-height: 4px;
+}
+
+.weekly-bar-group:hover .weekly-bar-fill {
+  background: linear-gradient(180deg, #c084fc 0%, #9333ea 100%);
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.45);
+}
+
+.weekly-val-badge {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #ffffff;
+  background: #7e22ce;
+  padding: 2px 6px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(126, 34, 206, 0.3);
+  white-space: nowrap;
+}
+
+.weekly-label-group {
+  height: 38px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.weekly-day-name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.weekly-bar-group.is-today .weekly-day-name {
+  color: #7e22ce;
+  font-weight: 800;
+}
+
+.weekly-date-sub {
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.weekly-bar-group.is-today .weekly-date-sub {
+  color: #a855f7;
+  font-weight: 600;
+}
+
+/* Pie / Doughnut Chart (Status Distribution) */
+.pie-chart-body {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.5rem 0;
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .pie-chart-body {
+    flex-direction: column;
+  }
+}
+
+.pie-chart-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pie-doughnut-circle {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.doughnut-center-hole {
+  width: 100px;
+  height: 100px;
+  background: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.hole-number {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.hole-label {
+  font-size: 0.6875rem;
+  color: #64748b;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.pie-legend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.pie-legend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 0.8125rem;
+  transition: background 0.15s ease;
+}
+
+.pie-legend-item:hover {
+  background: #f1f5f9;
+}
+
+.legend-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-badge-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legend-name {
+  color: #334155;
+  font-weight: 600;
+}
+
+.legend-vals {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.legend-count {
+  color: #64748b;
+  font-weight: 500;
+  font-size: 0.78125rem;
+}
+
+.legend-pct {
+  font-weight: 800;
+  min-width: 42px;
+  text-align: right;
+}
+
+/* Horizontal Bar Chart (Best Selling Products) */
+.horizontal-chart-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.btn-toggle-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-toggle-expand:hover {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+.hbar-chart-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.hbar-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  transition: all 0.2s ease;
+}
+
+.hbar-row:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.hbar-rank-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #e2e8f0;
+  color: #475569;
+  font-weight: 800;
+  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hbar-rank-badge.rank-top3 {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+}
+
+.hbar-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.hbar-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.hbar-prod-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hbar-prod-cat {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.hbar-progress-track {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.hbar-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1 0%, #4f46e5 100%);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.hbar-progress-fill.top-rank-fill {
+  background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+}
+
+.hbar-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+  min-width: 110px;
+}
+
+.hbar-sold-qty {
+  font-size: 0.8125rem;
+  color: #334155;
+}
+
+.hbar-sold-qty strong {
+  color: #4f46e5;
+  font-weight: 800;
+}
+
+.hbar-sold-rev {
+  font-size: 0.78125rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.empty-hbar-msg {
+  text-align: center;
+  color: #94a3b8;
+  padding: 2rem;
+}

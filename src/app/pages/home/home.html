@@ -11,16 +11,34 @@
       </div>
 
       <div class="user-menu">
-        <div class="user-info">
-          <span class="user-badge" [class.badge-admin]="userRole() === 'admin'">
-            {{ userRole() === 'admin' ? 'Quyền: QTV / Admin' : 'Khách hàng' }}
-          </span>
-          <span class="user-email">{{ userEmail() }}</span>
-        </div>
-        @if (userRole() === 'admin') {
-          <a routerLink="/dashboard" class="btn-admin-panel">Trang Quản Trị Admin ➔</a>
+        <!-- Cart Icon Button (Positioned LEFT of User Info) -->
+        <button class="cart-btn" (click)="openCartModal()" title="Xem giỏ hàng">
+          <div class="cart-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="9" cy="21" r="1"></circle>
+              <circle cx="20" cy="21" r="1"></circle>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            @if (totalCartQuantity() > 0) {
+              <span class="cart-badge">{{ totalCartQuantity() }}</span>
+            }
+          </div>
+        </button>
+
+        @if (isLoggedIn()) {
+          <div class="user-info">
+            <span class="user-badge" [class.badge-admin]="userRole() === 'admin'">
+              {{ userRole() === 'admin' ? 'Quyền: QTV / Admin' : 'Khách hàng' }}
+            </span>
+            <span class="user-name">{{ userName() }}</span>
+          </div>
+          @if (userRole() === 'admin') {
+            <a routerLink="/dashboard" class="btn-admin-panel">Trang Quản Trị Admin ➔</a>
+          }
+          <button class="btn-logout" (click)="onLogout()">Đăng xuất</button>
+        } @else {
+          <a routerLink="/login" class="btn-login-header">Đăng nhập</a>
         }
-        <button class="btn-logout" (click)="onLogout()">Đăng xuất</button>
       </div>
     </div>
   </header>
@@ -62,9 +80,22 @@
             <p class="prod-desc">{{ prod.description || 'Chưa có mô tả chi tiết' }}</p>
             <div class="card-footer">
               <span class="prod-price">{{ formatCurrency(prod.price) }}</span>
-              <span class="stock-status" [class.in-stock]="prod.inStock">
-                {{ prod.inStock ? 'Còn hàng (' + prod.quantity + ')' : 'Hết hàng' }}
-              </span>
+              @if (!prod.inStock || prod.quantity <= 0) {
+                <button class="btn-out-of-stock" disabled>
+                  Hết hàng
+                </button>
+              } @else if (userRole() === 'admin') {
+                <button class="btn-add-cart" disabled title="Admin không thể mua hàng">
+                  Đặt hàng
+                </button>
+              } @else {
+                <button 
+                  class="btn-add-cart" 
+                  (click)="addToCart(prod)"
+                >
+                  Đặt hàng
+                </button>
+              }
             </div>
           </div>
         </div>
@@ -75,4 +106,89 @@
       }
     </div>
   </main>
+
+  <!-- Cart Popup Modal -->
+  @if (isCartOpen()) {
+    <div class="modal-backdrop" (click)="closeCartModal()">
+      <div class="modal-card cart-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-title-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2">
+              <circle cx="9" cy="21" r="1"></circle>
+              <circle cx="20" cy="21" r="1"></circle>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            <h3>Giỏ hàng của bạn</h3>
+          </div>
+          <button type="button" class="btn-close" (click)="closeCartModal()">✕</button>
+        </div>
+
+        <div class="modal-body cart-modal-body">
+          @if (cartItems().length > 0) {
+            <div class="cart-items-list">
+              @for (item of cartItems(); track item.product.id) {
+                <div class="cart-item-card">
+                  <div class="cart-item-thumb">
+                    @if (item.product.images && item.product.images.length > 0) {
+                      <img [src]="item.product.images[0]" [alt]="item.product.name" />
+                    } @else {
+                      <div class="no-img-small">📦</div>
+                    }
+                  </div>
+                  <div class="cart-item-details">
+                    <div class="cart-item-header">
+                      <h5 class="cart-item-title">{{ item.product.name }}</h5>
+                      <button class="btn-remove-item" (click)="removeFromCart(item.product.id)" title="Xóa sản phẩm">
+                        ✕
+                      </button>
+                    </div>
+                    <div class="cart-item-unit-price">Đơn giá: {{ formatCurrency(item.product.price) }}</div>
+                    <div class="cart-item-actions">
+                      <div class="cart-qty-controls">
+                        <button class="qty-btn" (click)="updateQuantity(item.product.id, -1)">-</button>
+                        <span class="qty-val">{{ item.quantity }}</span>
+                        <button 
+                          class="qty-btn" 
+                          [disabled]="item.quantity >= item.product.quantity" 
+                          (click)="updateQuantity(item.product.id, 1)"
+                          [title]="item.quantity >= item.product.quantity ? 'Số lượng đạt giới hạn tồn kho' : 'Tăng số lượng'"
+                        >+</button>
+                      </div>
+                      <div class="cart-item-subtotal">
+                        {{ formatCurrency(item.product.price * item.quantity) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="cart-empty-box">
+              <div class="cart-empty-icon">🛒</div>
+              <h4>Giỏ hàng của bạn đang trống</h4>
+              <p>Hãy bấm nút "Đặt hàng" trên sản phẩm để thêm vào giỏ hàng.</p>
+            </div>
+          }
+        </div>
+
+        @if (cartItems().length > 0) {
+          <div class="modal-footer cart-modal-footer">
+            <div class="cart-totals-summary">
+              <div class="summary-row">
+                <span class="summary-label">Tổng số lượng sản phẩm:</span>
+                <span class="summary-val-qty">{{ totalCartQuantity() }} sản phẩm</span>
+              </div>
+              <div class="summary-row total-amount-row">
+                <span class="summary-label">Tổng thanh toán:</span>
+                <span class="summary-val-price">{{ formatCurrency(totalCartPrice()) }}</span>
+              </div>
+            </div>
+            <button type="button" class="btn-checkout" (click)="checkoutCart()">
+              Đặt hàng ngay
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  }
 </div>

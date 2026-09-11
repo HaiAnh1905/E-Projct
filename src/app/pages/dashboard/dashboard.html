@@ -318,6 +318,170 @@
     </div>
   </div>
 
+  <!-- Two Column Charts Section: Bar Chart (Order Count) & Pie Chart (Status Distribution) -->
+  <div class="charts-two-col">
+    <!-- Left: Bar Chart - Order Count Over Time -->
+    <div class="chart-card-col">
+      <div class="chart-card-header">
+        <div class="chart-title-wrapper">
+          <div class="chart-icon-box bg-purple-light">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="12" width="4" height="9" rx="1"></rect>
+              <rect x="10" y="7" width="4" height="14" rx="1"></rect>
+              <rect x="17" y="3" width="4" height="18" rx="1"></rect>
+            </svg>
+          </div>
+          <div>
+            <h3>Số lượng Đơn hàng theo Thời gian (T2 - CN)</h3>
+            <p class="chart-subtitle">
+              Tổng số lượng đơn phát sinh tuần này ({{ weeklyOrderCountData().weekRangeStr }}): <strong>{{ weeklyOrderCountData().totalWeekOrders }} đơn</strong>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bar-chart-container">
+        <div class="weekly-chart-layout">
+          <!-- Left Y-Axis Labels Column -->
+          <div class="weekly-y-axis-col">
+            <div class="weekly-y-axis-ticks">
+              @for (tick of weeklyOrderCountData().yTicks; track tick) {
+                <span class="y-tick-label">{{ tick }}</span>
+              }
+            </div>
+            <div class="weekly-y-axis-spacer"></div>
+          </div>
+
+          <!-- Main Chart Area (Gridlines + 7 Day Bars) -->
+          <div class="weekly-chart-area">
+            <!-- Background Horizontal Gridlines -->
+            <div class="weekly-grid-lines">
+              @for (tick of weeklyOrderCountData().yTicks; track tick) {
+                <div class="grid-line-item" [style.bottom.%]="(tick / weeklyOrderCountData().maxCount) * 100"></div>
+              }
+            </div>
+
+            <!-- Bars Container -->
+            <div class="weekly-bars-wrapper">
+              @for (dItem of weeklyOrderCountData().days; track dItem.label) {
+                <div class="weekly-bar-group" [class.is-today]="dItem.isToday">
+                  <div class="weekly-bar-track">
+                    <div 
+                      class="weekly-bar-fill" 
+                      [style.height.%]="dItem.count > 0 ? (dItem.count / weeklyOrderCountData().maxCount) * 100 : 0"
+                      [title]="dItem.fullDayName + ' (' + dItem.dateStr + '): ' + dItem.count + ' đơn hàng (' + dItem.deliveredCount + ' đã giao)'"
+                    >
+                      @if (dItem.count > 0) {
+                        <span class="weekly-val-badge">{{ dItem.count }}</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="weekly-label-group">
+                    <span class="weekly-day-name">{{ dItem.label }}</span>
+                    <span class="weekly-date-sub">{{ dItem.dateStr }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Pie Chart - Order Status Distribution -->
+    <div class="chart-card-col">
+      <div class="chart-card-header">
+        <div class="chart-title-wrapper">
+          <div class="chart-icon-box bg-emerald-light">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+              <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3>Tỷ lệ Trạng thái Đơn hàng</h3>
+            <p class="chart-subtitle">Phân bổ tỷ lệ trên tổng <strong>{{ totalOrdersCount() }} đơn hàng</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="pie-chart-body">
+        <div class="pie-chart-visual">
+          <div class="pie-doughnut-circle" [style.background]="pieConicGradient()">
+            <div class="doughnut-center-hole">
+              <span class="hole-number">{{ totalOrdersCount() }}</span>
+              <span class="hole-label">Đơn hàng</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pie-legend-list">
+          @for (sItem of orderStatusPieData(); track sItem.key) {
+            <div class="pie-legend-item">
+              <div class="legend-info">
+                <span class="legend-badge-dot" [style.background]="sItem.color"></span>
+                <span class="legend-name">{{ sItem.label }}</span>
+              </div>
+              <div class="legend-vals">
+                <span class="legend-count">{{ sItem.count }} đơn</span>
+                <span class="legend-pct" [style.color]="sItem.color">{{ sItem.percentage }}%</span>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Horizontal Bar Chart Section: Top Best Selling Products -->
+  <div class="horizontal-chart-card">
+    <div class="chart-header">
+      <div class="chart-title-wrapper">
+        <div class="chart-icon-box bg-amber-light">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+            <polyline points="17 6 23 6 23 12"></polyline>
+          </svg>
+        </div>
+        <div>
+          <h3>Top Sản phẩm Bán chạy nhất</h3>
+          <p class="chart-subtitle">
+            Hiển thị <strong>{{ displayedTopSellingProducts().length }} / {{ topSellingProductsAll().length }}</strong> sản phẩm có doanh số cao nhất
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="hbar-chart-body">
+      @for (prod of displayedTopSellingProducts(); track prod.name) {
+        <div class="hbar-row">
+          <div class="hbar-rank-badge" [class.rank-top3]="prod.rank <= 3">
+            #{{ prod.rank }}
+          </div>
+          <div class="hbar-details">
+            <div class="hbar-name-row">
+              <span class="hbar-prod-name">{{ prod.name }}</span>
+              <span class="hbar-prod-cat">{{ prod.category }}</span>
+            </div>
+            <div class="hbar-progress-track">
+              <div 
+                class="hbar-progress-fill" 
+                [style.width.%]="prod.percentOfMax"
+                [class.top-rank-fill]="prod.rank === 1"
+              ></div>
+            </div>
+          </div>
+          <div class="hbar-stats">
+            <span class="hbar-sold-qty"><strong>{{ prod.totalSold }}</strong> đã bán</span>
+            <span class="hbar-sold-rev">{{ formatCurrency(prod.totalRevenue) }}</span>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-hbar-msg">Chưa có dữ liệu bán hàng</div>
+      }
+    </div>
+  </div>
+
   <!-- Dashboard Content Widgets Grid -->
   <div class="widgets-grid">
     <!-- Widget 1: Recent Orders Card (Max 5 items per page) -->

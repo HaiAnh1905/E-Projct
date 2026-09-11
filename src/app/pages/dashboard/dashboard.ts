@@ -234,8 +234,14 @@ export class DashboardPage {
 
       // Match selected month and year
       if (year === targetYear && month === targetMonth && day >= 1 && day <= totalDays) {
-        // Enforce strict check: Block any dates in the future beyond TODAY (September 8, 2026)
-        if (year > 2026 || (year === 2026 && month > 9) || (year === 2026 && month === 9 && day > 8)) {
+        // Enforce strict check: Block any dates strictly in the future beyond TODAY
+        const today = new Date();
+        const isFuture =
+          year > today.getFullYear() ||
+          (year === today.getFullYear() && month > today.getMonth() + 1) ||
+          (year === today.getFullYear() && month === today.getMonth() + 1 && day > today.getDate());
+
+        if (isFuture) {
           continue;
         }
 
@@ -497,6 +503,196 @@ export class DashboardPage {
     this.selectedCategory.set(categoryName);
   }
 
+  // ==========================================
+  // CHART 1: ORDER STATUS DISTRIBUTION (PIE/DOUGHNUT CHART)
+  // ==========================================
+
+  orderStatusCounts = computed(() => {
+    const list = this.orders();
+    const counts = {
+      pending: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      returned: 0,
+      cancelled: 0,
+    };
+
+    for (const o of list) {
+      if (counts[o.status] !== undefined) {
+        counts[o.status]++;
+      }
+    }
+    return counts;
+  });
+
+  orderStatusPieData = computed(() => {
+    const counts = this.orderStatusCounts();
+    const total = this.orders().length;
+
+    const items = [
+      { key: 'delivered', label: 'Giao hàng thành công', count: counts.delivered, color: '#10b981' },
+      { key: 'shipped', label: 'Đang giao hàng', count: counts.shipped, color: '#8b5cf6' },
+      { key: 'processing', label: 'Đang xử lý', count: counts.processing, color: '#3b82f6' },
+      { key: 'pending', label: 'Chờ xử lý', count: counts.pending, color: '#f59e0b' },
+      { key: 'returned', label: 'Trả hàng', count: counts.returned, color: '#ef4444' },
+      { key: 'cancelled', label: 'Đã hủy', count: counts.cancelled, color: '#64748b' },
+    ];
+
+    if (total === 0) {
+      return items.map((it) => ({ ...it, percentage: 0, percentVal: 0 }));
+    }
+
+    return items.map((it) => {
+      const percentage = parseFloat(((it.count / total) * 100).toFixed(1));
+      return {
+        ...it,
+        percentage,
+        percentVal: it.count / total,
+      };
+    });
+  });
+
+  pieConicGradient = computed(() => {
+    const data = this.orderStatusPieData();
+    const total = this.orders().length;
+    if (total === 0) return 'conic-gradient(#e2e8f0 0% 100%)';
+
+    let current = 0;
+    const parts: string[] = [];
+
+    for (const item of data) {
+      if (item.count > 0) {
+        const next = current + item.percentVal * 100;
+        parts.push(`${item.color} ${current.toFixed(2)}% ${next.toFixed(2)}%`);
+        current = next;
+      }
+    }
+
+    return parts.length > 0 ? `conic-gradient(${parts.join(', ')})` : 'conic-gradient(#e2e8f0 0% 100%)';
+  });
+
+  // ==========================================
+  // CHART 2: ORDER COUNT OVER TIME (7 DAYS WEEKLY BAR CHART: T2 - CN)
+  // ==========================================
+
+  weeklyOrderCountData = computed(() => {
+    const now = new Date();
+    const currentDayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+
+    // Distance to Monday (T2)
+    const diffToMonday = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+    const mondayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+
+    const weekDayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    const ordersList = this.orders();
+
+    const days = weekDayLabels.map((label, idx) => {
+      const d = new Date(mondayDate.getFullYear(), mondayDate.getMonth(), mondayDate.getDate() + idx);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const dateStr = `${day < 10 ? '0' : ''}${day}/${month < 10 ? '0' : ''}${month}`;
+
+      let count = 0;
+      let deliveredCount = 0;
+
+      for (const ord of ordersList) {
+        if (!ord.orderDate) continue;
+        const parsed = this.parseDateParts(ord.orderDate);
+        if (!parsed) continue;
+
+        if (parsed.year === year && parsed.month === month && parsed.day === day) {
+          count++;
+          if (ord.status === 'delivered') {
+            deliveredCount++;
+          }
+        }
+      }
+
+      return {
+        label,
+        fullDayName: idx === 6 ? 'Chủ nhật' : `Thứ ${idx + 2}`,
+        dateStr,
+        day,
+        month,
+        year,
+        count,
+        deliveredCount,
+        isToday: year === now.getFullYear() && month === now.getMonth() + 1 && day === now.getDate(),
+      };
+    });
+
+    let maxCount = Math.max(...days.map((d) => d.count), 4);
+    if (maxCount > 5 && maxCount % 2 !== 0) {
+      maxCount += 1;
+    }
+
+    let yTicks: number[] = [];
+    if (maxCount <= 6) {
+      for (let v = maxCount; v >= 0; v--) {
+        yTicks.push(v);
+      }
+    } else {
+      const step = Math.ceil(maxCount / 4);
+      maxCount = step * 4;
+      for (let i = 4; i >= 0; i--) {
+        yTicks.push(i * step);
+      }
+    }
+
+    const totalWeekOrders = days.reduce((sum, d) => sum + d.count, 0);
+
+    return {
+      days,
+      maxCount,
+      yTicks,
+      totalWeekOrders,
+      weekRangeStr: `${days[0].dateStr} - ${days[6].dateStr}/${days[6].year}`,
+    };
+  });
+
+  topSellingProductsAll = computed(() => {
+    const ordersList = this.orders().filter((o) => o.status !== 'cancelled');
+    const salesMap = new Map<string, { name: string; category: string; totalSold: number; totalRevenue: number }>();
+    const prodCatMap = this.productCategoryMap();
+
+    for (const ord of ordersList) {
+      for (const item of ord.items) {
+        const pName = item.productName;
+        const cat = prodCatMap.get(pName) || 'Sản phẩm';
+        const qty = item.quantity;
+        const rev = item.price * qty;
+
+        const existing = salesMap.get(pName);
+        if (existing) {
+          existing.totalSold += qty;
+          existing.totalRevenue += rev;
+        } else {
+          salesMap.set(pName, {
+            name: pName,
+            category: cat,
+            totalSold: qty,
+            totalRevenue: rev,
+          });
+        }
+      }
+    }
+
+    const sorted = Array.from(salesMap.values()).sort((a, b) => b.totalSold - a.totalSold || b.totalRevenue - a.totalRevenue);
+    const maxSold = sorted.length > 0 ? sorted[0].totalSold : 1;
+
+    return sorted.map((p, idx) => ({
+      ...p,
+      rank: idx + 1,
+      percentOfMax: Math.round((p.totalSold / maxSold) * 100),
+    }));
+  });
+
+  displayedTopSellingProducts = computed(() => {
+    return this.topSellingProductsAll().slice(0, 6);
+  });
+
   // Helpers
   formatCurrency(amount: number): string {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -520,7 +716,7 @@ export class DashboardPage {
       case 'pending': return 'Chờ xử lý';
       case 'processing': return 'Đang xử lý';
       case 'shipped': return 'Đang giao hàng';
-      case 'delivered': return 'Đã giao hàng';
+      case 'delivered': return 'Giao hàng thành công';
       case 'returned': return 'Trả hàng';
       case 'cancelled': return 'Đã hủy';
       default: return status;

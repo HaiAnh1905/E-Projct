@@ -104,7 +104,7 @@
           <option value="all">Tất cả trạng thái</option>
           <option value="processing">Đơn đang xử lý</option>
           <option value="shipped">Đang giao hàng</option>
-          <option value="delivered">Đã giao hàng</option>
+          <option value="delivered">Giao hàng thành công</option>
           <option value="returned">Trả hàng</option>
           <option value="cancelled">Đã hủy</option>
         </select>
@@ -171,7 +171,7 @@
                 </div>
               </td>
               <td class="td-delivery">
-                @if (order.status === 'delivered' && order.deliveryDate) {
+                @if ((order.status === 'delivered' || order.status === 'returned') && order.deliveryDate) {
                   <div class="date-wrapper text-success">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2">
                       <polyline points="20 6 9 17 4 12"></polyline>
@@ -342,12 +342,22 @@
             </div>
             <div class="detail-item">
               <span class="label">Ngày đặt hàng:</span>
-              <span class="value">{{ detailOrder.orderDate }}</span>
+              <div class="date-stacked">
+                <span class="date-main">{{ splitDate(detailOrder.orderDate).date }}</span>
+                @if (splitDate(detailOrder.orderDate).time) {
+                  <span class="time-sub">{{ splitDate(detailOrder.orderDate).time }}</span>
+                }
+              </div>
             </div>
             <div class="detail-item">
               <span class="label">Ngày hàng được giao:</span>
-              @if (detailOrder.status === 'delivered' && detailOrder.deliveryDate) {
-                <span class="value highlight-text">{{ detailOrder.deliveryDate }}</span>
+              @if ((detailOrder.status === 'delivered' || detailOrder.status === 'returned') && detailOrder.deliveryDate) {
+                <div class="date-stacked">
+                  <span class="date-main highlight-text">{{ splitDate(detailOrder.deliveryDate).date }}</span>
+                  @if (splitDate(detailOrder.deliveryDate).time) {
+                    <span class="time-sub">{{ splitDate(detailOrder.deliveryDate).time }}</span>
+                  }
+                </div>
               } @else if (detailOrder.status === 'shipped') {
                 <span class="value text-purple font-weight-600">Đang giao hàng (Đang vận chuyển)</span>
               } @else if (detailOrder.status === 'cancelled') {
@@ -412,7 +422,17 @@
               <strong>Thông tin Trả hàng:</strong>
             </div>
             <div class="return-detail-item">
-              <span class="label">Ngày trả hàng:</span> <strong>{{ detailOrder.returnDate || 'Chưa ghi nhận' }}</strong>
+              <span class="label">Ngày trả hàng:</span>
+              @if (detailOrder.returnDate) {
+                <div class="date-stacked" style="margin-top: 2px;">
+                  <span class="date-main text-warning">{{ splitDate(detailOrder.returnDate).date }}</span>
+                  @if (splitDate(detailOrder.returnDate).time) {
+                    <span class="time-sub">{{ splitDate(detailOrder.returnDate).time }}</span>
+                  }
+                </div>
+              } @else {
+                <strong>Chưa ghi nhận</strong>
+              }
             </div>
             <div class="return-detail-item">
               <span class="label">Lý do trả hàng:</span> <span>{{ detailOrder.returnReason || 'Không có lý do cụ thể' }}</span>
@@ -461,18 +481,24 @@
             <option value="pending" [disabled]="isStatusOptionDisabled('pending')">Chờ xử lý (Pending)</option>
             <option value="processing" [disabled]="isStatusOptionDisabled('processing')">Đang xử lý (Processing)</option>
             <option value="shipped" [disabled]="isStatusOptionDisabled('shipped')">Đang giao hàng (Shipped)</option>
-            <option value="delivered" [disabled]="isStatusOptionDisabled('delivered')">Đã giao hàng (Delivered)</option>
+            <option value="delivered" [disabled]="isStatusOptionDisabled('delivered')">Giao hàng thành công (Delivered)</option>
             <option value="returned" [disabled]="isStatusOptionDisabled('returned')">
-              Trả hàng (Returned){{ statusOrder.status !== 'delivered' ? ' (Chỉ khả dụng khi đã giao hàng)' : '' }}
+              Trả hàng (Returned){{ isReturnExpired(statusOrder) ? ' (Đã quá 7 ngày kể từ lúc mua hàng)' : (statusOrder.status !== 'delivered' ? ' (Chỉ khả dụng khi giao hàng thành công)' : '') }}
             </option>
             <option value="cancelled" [disabled]="isStatusOptionDisabled('cancelled')">
               Đã hủy (Cancelled){{ statusOrder.status === 'delivered' || statusOrder.status === 'returned' || statusOrder.status === 'cancelled' ? ' (Khóa đối với đơn đã giao/trả/hủy)' : '' }}
             </option>
           </select>
           @if (statusOrder.status === 'delivered') {
-            <span class="help-text text-warning font-weight-600" style="margin-top: 4px; display: block;">
-              ℹ️ Đơn hàng đã giao thành công. Không thể Hủy đơn, chỉ có thể chọn "Trả hàng".
-            </span>
+            @if (isReturnExpired(statusOrder)) {
+              <span class="help-text text-danger font-weight-600" style="margin-top: 4px; display: block;">
+                ⚠️ Đơn hàng mua ngày {{ statusOrder.orderDate }}. Đã quá thời hạn 7 ngày kể từ thời điểm mua hàng, không thể thực hiện Trả hàng!
+              </span>
+            } @else {
+              <span class="help-text text-warning font-weight-600" style="margin-top: 4px; display: block;">
+                ℹ️ Đơn hàng đã giao thành công (còn trong thời hạn 7 ngày mua hàng). Chỉ có thể chọn "Trả hàng".
+              </span>
+            }
           } @else if (statusOrder.status === 'returned') {
             <span class="help-text text-warning font-weight-600" style="margin-top: 4px; display: block;">
               ℹ️ Đơn hàng đã ở trạng thái "Trả hàng" (kích hoạt). Trạng thái này đã hoàn tất và deactivated các trạng thái khác.
@@ -483,7 +509,7 @@
             </span>
           } @else {
             <span class="help-text text-muted font-weight-600" style="margin-top: 4px; display: block;">
-              ℹ️ Quy trình trạng thái: Chờ xử lý ➔ Đang xử lý ➔ Đang giao hàng ➔ Đã giao hàng. Không thể chuyển lùi lại trạng thái trước đó.
+              ℹ️ Quy trình trạng thái: Chờ xử lý ➔ Đang xử lý ➔ Đang giao hàng ➔ Giao hàng thành công. Không thể chuyển lùi lại trạng thái trước đó.
             </span>
           }
         </div>
@@ -537,7 +563,7 @@
               type="datetime-local" 
               id="return-date-input" 
               [min]="minAllowedReturnDatetime()"
-              [max]="maxAllowedDatetime"
+              [max]="maxAllowedReturnDatetime()"
               [ngModel]="formatForDatetimeLocal(returnDateInput())" 
               (ngModelChange)="onReturnDatePicked($event)"
               class="datetime-picker-input"
@@ -560,13 +586,13 @@
               (ngModelChange)="onDeliveryDatePicked($event)"
               class="datetime-picker-input"
             />
-            <span class="help-text text-success">Nếu không chọn, hệ thống sẽ tự động ghi nhận thời gian hiện tại khi lưu 'Đã giao hàng'.</span>
+            <span class="help-text text-success">Nếu không chọn, hệ thống sẽ tự động ghi nhận thời gian hiện tại khi lưu 'Giao hàng thành công'.</span>
           </div>
         } @else {
           <div class="form-field">
             <label>Ngày hàng được giao / Trả hàng:</label>
             <div class="status-warning-box">
-              <span>⚠️ Đơn hàng có trạng thái <strong>"{{ getStatusLabel(newStatus()) }}"</strong> (chưa hoàn tất giao/trả). Ngày giao hoặc ngày trả sẽ tự động cập nhật khi chuyển sang <strong>"Đã giao hàng"</strong> hoặc <strong>"Trả hàng"</strong>.</span>
+              <span>⚠️ Đơn hàng có trạng thái <strong>"{{ getStatusLabel(newStatus()) }}"</strong> (chưa hoàn tất giao/trả). Ngày giao hoặc ngày trả sẽ tự động cập nhật khi chuyển sang <strong>"Giao hàng thành công"</strong> hoặc <strong>"Trả hàng"</strong>.</span>
             </div>
           </div>
         }

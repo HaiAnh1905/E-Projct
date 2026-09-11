@@ -327,14 +327,15 @@
 }
 
 .date-main {
-  font-weight: 600;
+  font-weight: 700;
   color: #0f172a;
 }
 
 .time-sub {
-  font-size: 0.75rem;
+  font-size: 0.78125rem;
   color: #64748b;
   font-weight: 500;
+  margin-top: 1px;
 }
 
 .text-warning {
