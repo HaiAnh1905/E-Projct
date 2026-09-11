@@ -1,14 +1,729 @@
 <div class="orders-page">
+  <!-- Page Header -->
   <div class="page-header">
-    <h2>🧾 Quản lý Đơn hàng</h2>
-    <p>Theo dõi và cập nhật trạng thái đơn hàng</p>
-  </div>
-
-  <div class="content-card">
-    <div class="empty-state">
-      <span class="empty-icon">🧾</span>
-      <h3>Trang Quản lý Đơn hàng</h3>
-      <p>Nơi hiển thị danh sách đơn hàng và chuyển đổi trạng thái: Pending ➔ Processing ➔ Completed ➔ Cancelled.</p>
+    <div>
+      <h2>Quản lý Đơn hàng</h2>
+      <p>Theo dõi, cập nhật trạng thái và ngày giao hàng cho các đơn hàng</p>
     </div>
   </div>
+
+  <!-- Summary Metric Cards -->
+  <div class="metrics-grid">
+    <div 
+      class="metric-card card-blue clickable-card" 
+      [class.active-card]="appliedStatus() === 'all'"
+      (click)="onMetricClick('all')"
+      title="Bấm để xem tất cả đơn hàng"
+    >
+      <div class="metric-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <path d="M16 10a4 4 0 0 1-8 0"></path>
+        </svg>
+      </div>
+      <div class="metric-content">
+        <span class="metric-title">Tổng đơn hàng</span>
+        <span class="metric-value">{{ totalOrdersCount() }}</span>
+      </div>
+    </div>
+
+    <div 
+      class="metric-card card-amber clickable-card" 
+      [class.active-card]="appliedStatus() === 'processing'"
+      (click)="onMetricClick('processing')"
+      title="Bấm để lọc các đơn đang xử lý"
+    >
+      <div class="metric-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      </div>
+      <div class="metric-content">
+        <span class="metric-title">Đơn đang xử lý</span>
+        <span class="metric-value">{{ pendingOrdersCount() }}</span>
+      </div>
+    </div>
+
+    <div 
+      class="metric-card card-emerald clickable-card" 
+      [class.active-card]="appliedStatus() === 'delivered'"
+      (click)="onMetricClick('delivered')"
+      title="Bấm để lọc các đơn đã giao thành công"
+    >
+      <div class="metric-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+      </div>
+      <div class="metric-content">
+        <span class="metric-title">Đơn đã giao thành công</span>
+        <span class="metric-value">{{ deliveredOrdersCount() }}</span>
+      </div>
+    </div>
+
+    <div class="metric-card card-indigo non-clickable-card">
+      <div class="metric-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="1" x2="12" y2="23"></line>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+      </div>
+      <div class="metric-content">
+        <span class="metric-title">Tổng doanh thu đơn</span>
+        <span class="metric-value">{{ formatCurrency(totalRevenue()) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toolbar Card -->
+  <div class="toolbar-card">
+    <div class="search-box">
+      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input 
+        type="text" 
+        placeholder="Tìm theo Mã đơn hàng, Tên user hoặc Số điện thoại..." 
+        [value]="searchQuery()"
+        (input)="onSearchInput($event)"
+      />
+      @if (searchQuery()) {
+        <button class="clear-search" (click)="searchQuery.set(''); currentPage.set(1)">✕</button>
+      }
+    </div>
+
+    <div class="filter-controls">
+      <!-- Status Filter -->
+      <div class="filter-group">
+        <label>Trạng thái:</label>
+        <select [ngModel]="selectedStatus()" (ngModelChange)="onStatusChange($event)">
+          <option value="all">Tất cả trạng thái</option>
+          <option value="processing">Đơn đang xử lý</option>
+          <option value="shipped">Đang giao hàng</option>
+          <option value="delivered">Giao hàng thành công</option>
+          <option value="returned">Trả hàng</option>
+          <option value="cancelled">Đã hủy</option>
+        </select>
+      </div>
+
+      <!-- Sort Filter -->
+      <div class="filter-group">
+        <label>Sắp xếp:</label>
+        <select [ngModel]="selectedSort()" (ngModelChange)="onSortChange($event)">
+          <option value="date-desc">Ngày đặt (Mới nhất ↓)</option>
+          <option value="date-asc">Ngày đặt (Cũ nhất ↑)</option>
+          <option value="delivery-desc">Ngày giao (Mới nhất ↓)</option>
+          <option value="delivery-asc">Ngày giao (Cũ nhất ↑)</option>
+          <option value="price-desc">Tổng tiền (Giảm dần ↓)</option>
+          <option value="price-asc">Tổng tiền (Tăng dần ↑)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Orders Data Table -->
+  <div class="table-card">
+    <div class="table-responsive">
+      <table class="orders-table">
+        <thead>
+          <tr>
+            <th class="th-stt">STT</th>
+            <th class="th-code">Mã đơn hàng</th>
+            <th class="th-user">Tên user</th>
+            <th class="th-date">Ngày đặt hàng</th>
+            <th class="th-delivery">Ngày hàng được giao</th>
+            <th class="th-total">Tổng tiền</th>
+            <th class="th-status">Trạng thái đặt hàng</th>
+            <th class="th-actions">Hành động</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (order of paginatedOrders(); track order.id; let index = $index) {
+            <tr>
+              <td class="td-stt">{{ startIndex() + index }}</td>
+              <td class="td-code">
+                <span class="order-code-badge">{{ order.orderCode }}</span>
+              </td>
+              <td class="td-user">
+                <div class="user-info">
+                  <span class="user-name">{{ order.userName }}</span>
+                  <span class="user-subtext">{{ order.customerPhone }}</span>
+                </div>
+              </td>
+              <td class="td-date">
+                <div class="date-wrapper">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                  <div class="date-stacked">
+                    <span class="date-main">{{ splitDate(order.orderDate).date }}</span>
+                    @if (splitDate(order.orderDate).time) {
+                      <span class="time-sub">{{ splitDate(order.orderDate).time }}</span>
+                    }
+                  </div>
+                </div>
+              </td>
+              <td class="td-delivery">
+                @if ((order.status === 'delivered' || order.status === 'returned') && order.deliveryDate) {
+                  <div class="date-wrapper text-success">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <div class="date-stacked">
+                      <span class="date-main">{{ splitDate(order.deliveryDate).date }}</span>
+                      @if (splitDate(order.deliveryDate).time) {
+                        <span class="time-sub">{{ splitDate(order.deliveryDate).time }}</span>
+                      }
+                    </div>
+                  </div>
+                } @else if (order.status === 'returned' && order.returnDate) {
+                  <div class="date-wrapper text-warning">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
+                      <polyline points="1 4 1 10 7 10"></polyline>
+                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                    </svg>
+                    <div class="date-stacked">
+                      <span class="date-main">{{ splitDate(order.returnDate).date }}</span>
+                      @if (splitDate(order.returnDate).time) {
+                        <span class="time-sub">{{ splitDate(order.returnDate).time }}</span>
+                      }
+                    </div>
+                  </div>
+                } @else if (order.status === 'shipped') {
+                  <span class="badge-not-delivered badge-shipping">
+                    Đang vận chuyển
+                  </span>
+                } @else if (order.status === 'cancelled') {
+                  <span class="badge-not-delivered text-danger">
+                    Đã hủy đơn
+                  </span>
+                } @else {
+                  <span class="badge-not-delivered">
+                    Chưa giao
+                  </span>
+                }
+              </td>
+              <td class="td-total">{{ formatCurrency(order.totalAmount) }}</td>
+              <td class="td-status">
+                <span class="status-pill status-{{ order.status }}">
+                  <span class="dot"></span>
+                  {{ getStatusLabel(order.status) }}
+                </span>
+              </td>
+              <td class="td-actions">
+                <div class="action-buttons">
+                  <button 
+                    class="btn-action btn-view" 
+                    (click)="openDetailModal(order)" 
+                    title="Xem chi tiết đơn hàng"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  </button>
+
+                  <button 
+                    class="btn-action btn-status" 
+                    (click)="openStatusModal(order)" 
+                    title="Cập nhật trạng thái & ngày giao hàng"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                  </button>
+
+                  <button 
+                    class="btn-action btn-delete" 
+                    (click)="openDeleteModal(order)" 
+                    title="Xóa đơn hàng"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="8" class="no-data">
+                <div class="empty-state">
+                  <span class="empty-icon">🧾</span>
+                  <h4>Không tìm thấy đơn hàng phù hợp</h4>
+                  <p>Hãy thử thay đổi từ khóa tìm kiếm hoặc bỏ bộ lọc trạng thái</p>
+                  <button class="btn-reset" (click)="resetFilters()">Đặt lại bộ lọc</button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Table Pagination -->
+    @if (filteredOrders().length > 0) {
+      <div class="pagination-bar">
+        <div class="pagination-info">
+          <span>Hiển thị <strong>{{ startIndex() }}</strong> - <strong>{{ endIndex() }}</strong> trên tổng số <strong>{{ filteredOrders().length }}</strong> đơn hàng</span>
+          
+          <div class="page-size-selector">
+            <label for="orderPageSize">Hiển thị:</label>
+            <select id="orderPageSize" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
+              <option [value]="5">5 đơn hàng / trang</option>
+              <option [value]="10">10 đơn hàng / trang</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pagination-controls">
+          <button class="page-btn" [disabled]="currentPage() === 1" (click)="goToPage(1)">««</button>
+          <button class="page-btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)">‹ Trang trước</button>
+          <span class="page-indicator">Trang <strong>{{ currentPage() }}</strong> / <strong>{{ totalPages() }}</strong></span>
+          <button class="page-btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)">Trang tiếp ›</button>
+          <button class="page-btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())">»»</button>
+        </div>
+      </div>
+    }
+  </div>
 </div>
+
+<!-- Modal 1: View Order Detail -->
+@if (selectedOrderForDetail(); as detailOrder) {
+  <div class="modal-backdrop" (click)="closeDetailModal()">
+    <div class="modal-card modal-detail-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title-wrapper">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <h3>Chi tiết Đơn hàng {{ detailOrder.orderCode }}</h3>
+        </div>
+        <button type="button" class="btn-close" (click)="closeDetailModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Customer Details Section -->
+        <div class="detail-section">
+          <h4 class="section-title">Thông tin khách hàng & Giao hàng</h4>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="label">Tên user:</span>
+              <span class="value font-weight-600">{{ detailOrder.userName }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Số điện thoại:</span>
+              <span class="value">{{ detailOrder.customerPhone }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Email:</span>
+              <span class="value">{{ detailOrder.customerEmail }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Phương thức thanh toán:</span>
+              <span class="value">{{ detailOrder.paymentMethod }}</span>
+            </div>
+            <div class="detail-item span-full">
+              <span class="label">Địa chỉ nhận hàng:</span>
+              <span class="value">{{ detailOrder.shippingAddress }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Ngày đặt hàng:</span>
+              <div class="date-stacked">
+                <span class="date-main">{{ splitDate(detailOrder.orderDate).date }}</span>
+                @if (splitDate(detailOrder.orderDate).time) {
+                  <span class="time-sub">{{ splitDate(detailOrder.orderDate).time }}</span>
+                }
+              </div>
+            </div>
+            <div class="detail-item">
+              <span class="label">Ngày hàng được giao:</span>
+              @if ((detailOrder.status === 'delivered' || detailOrder.status === 'returned') && detailOrder.deliveryDate) {
+                <div class="date-stacked">
+                  <span class="date-main highlight-text">{{ splitDate(detailOrder.deliveryDate).date }}</span>
+                  @if (splitDate(detailOrder.deliveryDate).time) {
+                    <span class="time-sub">{{ splitDate(detailOrder.deliveryDate).time }}</span>
+                  }
+                </div>
+              } @else if (detailOrder.status === 'shipped') {
+                <span class="value text-purple font-weight-600">Đang giao hàng (Đang vận chuyển)</span>
+              } @else if (detailOrder.status === 'cancelled') {
+                <span class="value text-danger font-weight-600">Đã hủy đơn hàng</span>
+              } @else {
+                <span class="value text-muted">Chưa giao (Đang xử lý)</span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="detail-section">
+          <h4 class="section-title">Danh sách sản phẩm trong đơn</h4>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Tên sản phẩm</th>
+                <th class="text-center">Số lượng</th>
+                <th class="text-right">Đơn giá</th>
+                <th class="text-right">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of detailOrder.items; track item.productName) {
+                <tr>
+                  <td>{{ item.productName }}</td>
+                  <td class="text-center">{{ item.quantity }}</td>
+                  <td class="text-right">{{ formatCurrency(item.price) }}</td>
+                  <td class="text-right font-weight-600">{{ formatCurrency(item.price * item.quantity) }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3" class="text-right font-weight-700">Tổng tiền đơn hàng:</td>
+                <td class="text-right total-price">{{ formatCurrency(detailOrder.totalAmount) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        @if (detailOrder.status === 'cancelled') {
+          <div class="detail-cancel-reason-box">
+            <div class="cancel-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+              </svg>
+              <strong>Lý do hủy đơn hàng:</strong>
+            </div>
+            <p class="cancel-text">{{ detailOrder.cancelReason || 'Không có lý do cụ thể' }}</p>
+          </div>
+        } @else if (detailOrder.status === 'returned') {
+          <div class="detail-return-box">
+            <div class="return-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+              </svg>
+              <strong>Thông tin Trả hàng:</strong>
+            </div>
+            <div class="return-detail-item">
+              <span class="label">Ngày trả hàng:</span>
+              @if (detailOrder.returnDate) {
+                <div class="date-stacked" style="margin-top: 2px;">
+                  <span class="date-main text-warning">{{ splitDate(detailOrder.returnDate).date }}</span>
+                  @if (splitDate(detailOrder.returnDate).time) {
+                    <span class="time-sub">{{ splitDate(detailOrder.returnDate).time }}</span>
+                  }
+                </div>
+              } @else {
+                <strong>Chưa ghi nhận</strong>
+              }
+            </div>
+            <div class="return-detail-item">
+              <span class="label">Lý do trả hàng:</span> <span>{{ detailOrder.returnReason || 'Không có lý do cụ thể' }}</span>
+            </div>
+          </div>
+        }
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="closeDetailModal()">Đóng</button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal 2: Update Status & Delivery Date -->
+@if (selectedOrderForStatus(); as statusOrder) {
+  <div class="modal-backdrop" (click)="closeStatusModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title-wrapper">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          <h3>Cập nhật Trạng thái Đơn hàng {{ statusOrder.orderCode }}</h3>
+        </div>
+        <button type="button" class="btn-close" (click)="closeStatusModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-field">
+          <label>Mã đơn hàng & Khách hàng:</label>
+          <div class="read-only-box">
+            <strong>{{ statusOrder.orderCode }}</strong> - {{ statusOrder.userName }} ({{ formatCurrency(statusOrder.totalAmount) }})
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="order-status-select">Trạng thái đơn hàng <span class="required">*</span></label>
+          <select 
+            id="order-status-select" 
+            [ngModel]="newStatus()" 
+            (ngModelChange)="onModalStatusChange($event)"
+          >
+            <option value="pending" [disabled]="isStatusOptionDisabled('pending')">Chờ xử lý (Pending)</option>
+            <option value="processing" [disabled]="isStatusOptionDisabled('processing')">Đang xử lý (Processing)</option>
+            <option value="shipped" [disabled]="isStatusOptionDisabled('shipped')">Đang giao hàng (Shipped)</option>
+            <option value="delivered" [disabled]="isStatusOptionDisabled('delivered')">Giao hàng thành công (Delivered)</option>
+            <option value="returned" [disabled]="isStatusOptionDisabled('returned')">
+              Trả hàng (Returned){{ isReturnExpired(statusOrder) ? ' (Đã quá 7 ngày kể từ lúc mua hàng)' : (statusOrder.status !== 'delivered' ? ' (Chỉ khả dụng khi giao hàng thành công)' : '') }}
+            </option>
+            <option value="cancelled" [disabled]="isStatusOptionDisabled('cancelled')">
+              Đã hủy (Cancelled){{ statusOrder.status === 'delivered' || statusOrder.status === 'returned' || statusOrder.status === 'cancelled' ? ' (Khóa đối với đơn đã giao/trả/hủy)' : '' }}
+            </option>
+          </select>
+          @if (statusOrder.status === 'delivered') {
+            @if (isReturnExpired(statusOrder)) {
+              <span class="help-text text-danger font-weight-600" style="margin-top: 4px; display: block;">
+                ⚠️ Đơn hàng mua ngày {{ statusOrder.orderDate }}. Đã quá thời hạn 7 ngày kể từ thời điểm mua hàng, không thể thực hiện Trả hàng!
+              </span>
+            } @else {
+              <span class="help-text text-warning font-weight-600" style="margin-top: 4px; display: block;">
+                ℹ️ Đơn hàng đã giao thành công (còn trong thời hạn 7 ngày mua hàng). Chỉ có thể chọn "Trả hàng".
+              </span>
+            }
+          } @else if (statusOrder.status === 'returned') {
+            <span class="help-text text-warning font-weight-600" style="margin-top: 4px; display: block;">
+              ℹ️ Đơn hàng đã ở trạng thái "Trả hàng" (kích hoạt). Trạng thái này đã hoàn tất và deactivated các trạng thái khác.
+            </span>
+          } @else if (statusOrder.status === 'cancelled') {
+            <span class="help-text text-warning font-weight-600" style="margin-top: 4px; display: block;">
+              ℹ️ Đơn hàng đã "Hủy" (kích hoạt). Trạng thái này đã hoàn tất và deactivated các trạng thái khác.
+            </span>
+          } @else {
+            <span class="help-text text-muted font-weight-600" style="margin-top: 4px; display: block;">
+              ℹ️ Quy trình trạng thái: Chờ xử lý ➔ Đang xử lý ➔ Đang giao hàng ➔ Giao hàng thành công. Không thể chuyển lùi lại trạng thái trước đó.
+            </span>
+          }
+        </div>
+
+        @if (newStatus() === 'cancelled') {
+          <div class="form-field">
+            <label for="cancel-reason-input">Lý do hủy đơn hàng <span class="required">*</span></label>
+            <textarea
+              id="cancel-reason-input"
+              rows="3"
+              [ngModel]="cancelReasonInput()"
+              (ngModelChange)="cancelReasonInput.set($event)"
+              placeholder="Nhập chi tiết lý do hủy đơn hàng (vd: Khách hàng đổi ý, hết hàng dự phòng, thay đổi địa chỉ...)..."
+              class="cancel-textarea"
+              [class.input-invalid]="cancelReasonValidation().isBlocked"
+            ></textarea>
+            @if (cancelReasonValidation().isBlocked) {
+              <span class="error-text">Lý do hủy đơn không được để trống</span>
+            }
+
+            @if (statusOrder.status === 'shipped' || statusOrder.status === 'delivered') {
+              <div class="stock-restore-info">
+                <span>🔄 <strong>Thông báo tồn kho:</strong> Đơn hàng đang ở trạng thái <strong>"{{ getStatusLabel(statusOrder.status) }}"</strong>. Khi chuyển sang bị hủy, hệ thống sẽ <strong>tự động hoàn trả số lượng từng sản phẩm vào kho hàng</strong>.</span>
+              </div>
+            } @else {
+              <div class="stock-nochange-info">
+                <span>ℹ️ <strong>Thông báo tồn kho:</strong> Đơn hàng đang ở trạng thái <strong>"{{ getStatusLabel(statusOrder.status) }}"</strong> (chưa xuất kho). Khi chuyển sang bị hủy, số lượng tồn kho <strong>giữ nguyên không thay đổi</strong>.</span>
+              </div>
+            }
+          </div>
+        } @else if (newStatus() === 'returned') {
+          <div class="form-field">
+            <label for="return-reason-input">Lý do trả hàng <span class="required">*</span></label>
+            <textarea
+              id="return-reason-input"
+              rows="3"
+              [ngModel]="returnReasonInput()"
+              (ngModelChange)="returnReasonInput.set($event)"
+              placeholder="Nhập chi tiết lý do khách hàng trả hàng (vd: Sản phẩm lỗi kỹ thuật, sai kích thước, hư hỏng khi vận chuyển...)..."
+              class="cancel-textarea"
+              [class.input-invalid]="returnReasonValidation().isBlocked"
+            ></textarea>
+            @if (returnReasonValidation().isBlocked) {
+              <span class="error-text">Lý do trả hàng không được để trống</span>
+            }
+          </div>
+
+          <div class="form-field">
+            <label for="return-date-input">Chọn ngày giờ trả hàng <span class="required">*</span></label>
+            <input 
+              type="datetime-local" 
+              id="return-date-input" 
+              [min]="minAllowedReturnDatetime()"
+              [max]="maxAllowedReturnDatetime()"
+              [ngModel]="formatForDatetimeLocal(returnDateInput())" 
+              (ngModelChange)="onReturnDatePicked($event)"
+              class="datetime-picker-input"
+              [class.input-invalid]="returnDateValidation().isBlocked"
+            />
+            <span class="help-text text-success">Nếu không chọn, hệ thống sẽ tự động ghi nhận thời gian hiện tại khi lưu 'Trả hàng'.</span>
+          </div>
+
+          <div class="stock-restore-info">
+            <span>🔄 <strong>Thông báo tồn kho:</strong> Khi chuyển sang trạng thái <strong>"Trả hàng"</strong>, hệ thống sẽ <strong>tự động hoàn trả và cộng số lượng tất cả sản phẩm trong đơn vào hàng tồn kho</strong>.</span>
+          </div>
+        } @else if (newStatus() === 'delivered') {
+          <div class="form-field">
+            <label for="delivery-date-input">Chọn ngày giờ hàng được giao <span class="required">*</span></label>
+            <input 
+              type="datetime-local" 
+              id="delivery-date-input" 
+              [max]="maxAllowedDatetime"
+              [ngModel]="formatForDatetimeLocal(newDeliveryDate())" 
+              (ngModelChange)="onDeliveryDatePicked($event)"
+              class="datetime-picker-input"
+            />
+            <span class="help-text text-success">Nếu không chọn, hệ thống sẽ tự động ghi nhận thời gian hiện tại khi lưu 'Giao hàng thành công'.</span>
+          </div>
+        } @else {
+          <div class="form-field">
+            <label>Ngày hàng được giao / Trả hàng:</label>
+            <div class="status-warning-box">
+              <span>⚠️ Đơn hàng có trạng thái <strong>"{{ getStatusLabel(newStatus()) }}"</strong> (chưa hoàn tất giao/trả). Ngày giao hoặc ngày trả sẽ tự động cập nhật khi chuyển sang <strong>"Giao hàng thành công"</strong> hoặc <strong>"Trả hàng"</strong>.</span>
+            </div>
+          </div>
+        }
+
+        @if (statusTransitionValidation().isBlocked) {
+          <div class="stock-error-box">
+            <div class="error-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <strong>Không thể chuyển trạng thái!</strong>
+            </div>
+            <p>{{ statusTransitionValidation().message }}</p>
+          </div>
+        }
+
+        @if (stockValidation().isBlocked) {
+          <div class="stock-error-box">
+            <div class="error-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <strong>Không thể chuyển trạng thái tiếp theo!</strong>
+            </div>
+            <p>Sản phẩm trong đơn đã HẾT HÀNG hoặc không đủ số lượng tồn kho:</p>
+            <ul class="stock-error-list">
+              @for (itemText of stockValidation().outOfStockItems; track itemText) {
+                <li>❌ {{ itemText }}</li>
+              }
+            </ul>
+            <span class="error-footer-tip">💡 Vui lòng cập nhật bổ sung số lượng sản phẩm trong kho trước khi vận chuyển/giao hàng.</span>
+          </div>
+        }
+
+        @if (futureDateValidation().isBlocked) {
+          <div class="stock-error-box">
+            <div class="error-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <strong>Ngày giao hàng không hợp lệ!</strong>
+            </div>
+            <p>{{ futureDateValidation().message }}</p>
+            <span class="error-footer-tip">💡 Vui lòng nhập ngày giao hàng nhỏ hơn hoặc bằng ngày hôm nay.</span>
+          </div>
+        }
+
+        @if (returnDateValidation().isBlocked) {
+          <div class="stock-error-box">
+            <div class="error-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <strong>Ngày trả hàng không hợp lệ!</strong>
+            </div>
+            <p>{{ returnDateValidation().message }}</p>
+            <span class="error-footer-tip">💡 Vui lòng nhập ngày trả hàng nhỏ hơn hoặc bằng ngày hôm nay.</span>
+          </div>
+        }
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="closeStatusModal()">Hủy</button>
+          <button 
+            type="button" 
+            class="btn-primary" 
+            [disabled]="!hasFormChanges() || statusTransitionValidation().isBlocked || stockValidation().isBlocked || futureDateValidation().isBlocked || (newStatus() === 'cancelled' && cancelReasonValidation().isBlocked) || (newStatus() === 'returned' && (returnReasonValidation().isBlocked || returnDateValidation().isBlocked))" 
+            (click)="saveStatusUpdate()"
+          >
+            Lưu cập nhật
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal 3: Confirm Delete Order -->
+@if (deletingOrder(); as delOrder) {
+  <div class="modal-backdrop" (click)="closeDeleteModal()">
+    <div class="modal-card modal-delete-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title-wrapper text-danger">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="8.5" x2="12" y2="13.5" stroke-width="2.5"></line>
+            <circle cx="12" cy="17" r="1.2" fill="#dc2626" stroke="none"></circle>
+          </svg>
+          <h3>Xác nhận xóa đơn hàng</h3>
+        </div>
+        <button type="button" class="btn-close" (click)="closeDeleteModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p>Đơn hàng <strong>"{{ delOrder.orderCode }}"</strong> - Khách hàng: <strong>{{ delOrder.userName }}</strong> (Trạng thái: <strong>{{ getStatusLabel(delOrder.status) }}</strong>)</p>
+
+        @if (!deleteValidation().allowed) {
+          <div class="stock-error-box">
+            <div class="error-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <strong>Khóa chức năng xóa đơn hàng!</strong>
+            </div>
+            <p>{{ deleteValidation().message }}</p>
+          </div>
+        } @else {
+          <p class="warning-text">ℹ️ Đơn hàng sẽ được <strong>Xóa</strong>. Dữ liệu đơn hàng sẽ bị ẩn khỏi hệ thống danh sách và báo cáo nhưng vẫn lưu vết an toàn trong kho dữ liệu.</p>
+        }
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="closeDeleteModal()">Hủy bỏ</button>
+          <button 
+            type="button" 
+            class="btn-danger-confirm" 
+            [disabled]="!deleteValidation().allowed"
+            (click)="confirmDeleteOrder()"
+          >
+            Đồng ý Xóa
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
